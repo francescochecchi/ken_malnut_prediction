@@ -52,13 +52,14 @@
     
     # Add subcounties and survey strata where clusters are
     table(svy_obs$file, is.na(svy_obs$cluster))
-    svy_obs <- merge(svy_obs, cluster_locs, by = c("file", "cluster"), all.x =T)
-    table(svy_obs$file, is.na(svy_obs$subcounty))
+    svy_obs <- merge(svy_obs, cluster_locations, by = c("file", "cluster"), 
+      all.x =T)
+    table(svy_obs$file, is.na(svy_obs$adm2))
     table(svy_obs$file, svy_obs$stratum, useNA = "ifany")
     
     # Add subcounties and strata manually where needed
     x <- which(svy_obs$file == "ken_marsabit_0915.xlsx")
-    svy_obs[x, "subcounty"] <- "Baringo East - Tiaty"
+    svy_obs[x, "adm2"] <- "Baringo East - Tiaty"
     svy_obs[x, "stratum"] <- 1
 
     # Add other metavariables
@@ -69,21 +70,21 @@
     ## Add subcounties that belong to each stratum
     x <- by(svy_obs, svy_obs[, c("file", "stratum")], function (x) {
       data.frame(file = unique(x$file), stratum = unique(x$stratum),
-        subcounties_in_stratum = paste(sort(unique(x$subcounty)),collapse=", "))
+        subcounties_in_stratum = paste(sort(unique(x$adm2)),collapse=", "))
     })
     x <- do.call(rbind, x)
     svy_obs <- merge(svy_obs, x, by = c("file", "stratum"), all.x = T)        
     svy_obs[which(svy_obs$whole_county), "subcounties_in_stratum"] <- 
-      "whole county"
+      "whole adm1"
     
        
   #...................................      
   ## Check completeness and correct categories of key variables
 
-    # Subcounty / create subcounty inclusion criterion
-    table(svy_obs$subcounty, useNA = "ifany")
-    svy_obs$subcounty_crit <- ifelse(is.na(svy_obs$subcounty), FALSE, TRUE)
-    table(svy_obs$subcounty_crit)
+    # adm2 / create adm2 inclusion criterion
+    table(svy_obs$adm2, useNA = "ifany")
+    svy_obs$adm2_crit <- ifelse(is.na(svy_obs$adm2), FALSE, TRUE)
+    table(svy_obs$adm2_crit)
         
     # Sex
     table(svy_obs$sex, useNA = "ifany")
@@ -160,16 +161,16 @@
     df$date <- as.Date(paste("15", df$month, df$year, sep = "-"), "%d-%m-%Y")
     df$month_abb <- month.abb[df$month]
     df$n <- 1
-    df$subcounty_flag_crit <- ifelse(df$flag_crit & df$subcounty_crit, T, F)
+    df$adm2_flag_crit <- ifelse(df$flag_crit & df$adm2_crit, T, F)
     df$mmyy <- paste0(df$month_abb, "-", df$year)
     
     # Aggregate
     x <- aggregate(df[, c("n", "age_crit", "complete_crit", "flag_crit", 
-      "subcounty_flag_crit")], by = df[, c("file", "stratum", "mmyy", "date")], 
+      "adm2_flag_crit")], by = df[, c("file", "stratum", "mmyy", "date")], 
       FUN = sum, na.rm = T)
     
     # Add subcounties in each stratum
-    x1 <- unique(df[, c("file", "stratum", "county", "subcounties_in_stratum")])
+    x1 <- unique(df[, c("file", "stratum", "adm1", "subcounties_in_stratum")])
     x1 <- na.omit(x1)
     x <- merge(x, x1, by = c("file", "stratum"))
         
@@ -236,7 +237,7 @@
     x <- do.call(rbind, x)
 
     # Add other variables
-    x1 <- unique(df[, c("file", "stratum", "county", "subcounties_in_stratum")])
+    x1 <- unique(df[, c("file", "stratum", "adm1", "subcounties_in_stratum")])
     x1 <- na.omit(x1)
     x <- merge(x, x1, by = c("file", "stratum"))
     x$mmyy <- paste0(month.abb[month(x$date)], "-", year(x$date))
@@ -254,7 +255,7 @@
     x$prev_gam <- paste0(x$est_gam_pretty, " (", x$lci_gam_pretty, " to ", 
       x$uci_gam_pretty,")")
     x$deff_gam_pretty <- sprintf("%.2f", x$deff_gam)   
-    out <- x[, c("county", "stratum", "date", "mmyy", "subcounties_in_stratum",
+    out <- x[, c("adm1", "stratum", "date", "mmyy", "subcounties_in_stratum",
       "prev_sam", "deff_sam_pretty", "prev_gam", "deff_gam_pretty")]      
     colnames(out) <- gsub("_pretty", "", colnames(out))
     
@@ -266,12 +267,12 @@
   ## Graph GAM and SAM prevalences
 
     # Prepare data
-    df <- x[, c("county", "stratum", "subcounties_in_stratum", "date",
+    df <- x[, c("adm1", "stratum", "subcounties_in_stratum", "date",
       "est_sam", "lci_sam", "uci_sam", "est_gam", "lci_gam", "uci_gam")]
     df <- reshape(df, direction = "long", 
       varying = c("est_sam", "lci_sam", "uci_sam", "est_gam", 
         "lci_gam", "uci_gam"),
-      idvar = c("county", "stratum", "subcounties_in_stratum", "date"),
+      idvar = c("adm1", "stratum", "subcounties_in_stratum", "date"),
       timevar = "indicator", times = c("sam", "gam"),
       v.names = c("est", "lci", "uci")
     )
@@ -289,7 +290,7 @@
         breaks = seq(0, 0.5, 0.10), limits = c(0, 0.45)) +
       scale_colour_manual("stratum", values = palette_gen[c(2,6,10,14)]) +
       scale_fill_manual("stratum", values = palette_gen[c(2,6,10,14)]) +
-      facet_grid(county~.) +
+      facet_grid(adm1~.) +
       theme_bw() +
       theme(legend.position = "top", plot.margin = margin(10,5,0,0))
     ggsave(paste0(dir_path, "out/02_svy_estimates_gam.png"), units = "cm",
@@ -305,7 +306,7 @@
         breaks = seq(0, 0.14, 0.02), limits = c(0, 0.14)) +
       scale_colour_manual("stratum", values = palette_gen[c(2,6,10,14)]) +
       scale_fill_manual("stratum", values = palette_gen[c(2,6,10,14)]) +
-      facet_grid(county~.) +
+      facet_grid(adm1~.) +
       theme_bw() +
       theme(legend.position = "top", plot.margin = margin(10,5,0,0))
     ggsave(paste0(dir_path, "out/02_svy_estimates_sam.png"), units = "cm",
@@ -370,7 +371,7 @@
     x <- do.call(rbind, x)
 
     # Add other variables
-    x1 <- unique(df[, c("file", "stratum", "county", "subcounties_in_stratum")])
+    x1 <- unique(df[, c("file", "stratum", "adm1", "subcounties_in_stratum")])
     x1 <- na.omit(x1)
     x <- merge(x, x1, by = c("file", "stratum"))
     x$mmyy <- paste0(month.abb[month(x$date)], "-", year(x$date))
@@ -389,7 +390,7 @@
     x$all_acz <- paste0(x$est_acz_pretty, " (", x$lci_acz_pretty, " to ", 
       x$uci_acz_pretty,")")
     x$deff_acz_pretty <- sprintf("%.2f", x$deff_acz)   
-    out <- x[, c("county", "stratum", "date", "mmyy", "subcounties_in_stratum",
+    out <- x[, c("adm1", "stratum", "date", "mmyy", "subcounties_in_stratum",
       "all_whz", "deff_whz_pretty", "all_acz", "deff_acz_pretty")]      
     colnames(out) <- gsub("_pretty", "", colnames(out))
     
@@ -401,12 +402,12 @@
   ## Graph WHZ and MUAC Z-score point estimates
 
     # Prepare data
-    df <- x[, c("county", "stratum", "subcounties_in_stratum", "date",
+    df <- x[, c("adm1", "stratum", "subcounties_in_stratum", "date",
       "est_whz", "lci_whz", "uci_whz", "est_acz", "lci_acz", "uci_acz")]
     df <- reshape(df, direction = "long", 
       varying = c("est_whz", "lci_whz", "uci_whz", "est_acz", 
         "lci_acz", "uci_acz"),
-      idvar = c("county", "stratum", "subcounties_in_stratum", "date"),
+      idvar = c("adm1", "stratum", "subcounties_in_stratum", "date"),
       timevar = "indicator", times = c("whz", "acz"),
       v.names = c("est", "lci", "uci")
     )
@@ -424,7 +425,7 @@
         breaks = seq(-3, 0, 0.25), limits = c(-1.75, -0.25)) +
       scale_colour_manual("stratum", values = palette_gen[c(2,6,10,14)]) +
       scale_fill_manual("stratum", values = palette_gen[c(2,6,10,14)]) +
-      facet_grid(county~.) +
+      facet_grid(adm1~.) +
       theme_bw() +
       theme(legend.position = "top", plot.margin = margin(10,5,0,0))
     ggsave(paste0(dir_path, "out/02_svy_estimates_whz.png"), units = "cm",
@@ -440,7 +441,7 @@
         breaks = seq(-3, 0, 0.25), limits = c(-1.75, -0.25)) +
       scale_colour_manual("stratum", values = palette_gen[c(2,6,10,14)]) +
       scale_fill_manual("stratum", values = palette_gen[c(2,6,10,14)]) +
-      facet_grid(county~.) +
+      facet_grid(adm1~.) +
       theme_bw() +
       theme(legend.position = "top", plot.margin = margin(10,5,0,0))
     ggsave(paste0(dir_path, "out/02_svy_estimates_acz.png"), units = "cm",
@@ -456,11 +457,7 @@
     ggsave(paste0(dir_path, "out/02_svy_estimates_combi2.png"), units = "cm",
       dpi = "print", height = 23, width = 17)
      
-    
-    
-    
-    
-    
+
        
 #...............................................................................  
 ### ENDS
