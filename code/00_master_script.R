@@ -22,6 +22,7 @@
       archive,       # Unzip 7z files
       chirps,        # Download CHIRPS rainfall data
       exactextractr, # Extract statistics for each polygon from raster data
+      GGally,        # Produce correlation plots
       ggplot2,       # Visualise data
       ggpubr,        # Arrange multiple plots into a single plot
       ggrepel,       # Improve labelling of plots
@@ -30,7 +31,6 @@
       lubridate,     # Work with dates and times
       MASS,          # Implement various statistical methods
       mgcv,          # Fit generalised additive models
-#      mice,          # Impute missing variables
       parallel,      # Speed up code implementation
       psych,         # Implement Principal Components Analysis
       readxl,        # Read Excel files
@@ -80,6 +80,7 @@
 
 #...............................................................................
 ### Sourcing dependent scripts
+    # scripts 01 to 03 need only be run once; thereafter, can start from 04
 #...............................................................................
 
   #...................................      
@@ -90,6 +91,9 @@
   ## Prepare SMART survey anthropometric data
   source(paste0(dir_path, "code/02_prepare_survey_data.r") )
 
+  #...................................      
+  ## Merge all data together and categorise predictors
+  source(paste0(dir_path, "code/03_merge_categorise_predictors.r") )
 
           
 #...............................................................................  

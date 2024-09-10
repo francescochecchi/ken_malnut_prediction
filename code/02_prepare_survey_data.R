@@ -59,7 +59,8 @@
     
     # Add subcounties and strata manually where needed
     x <- which(svy_obs$file == "ken_marsabit_0915.xlsx")
-    svy_obs[x, "adm2"] <- "Baringo East - Tiaty"
+    svy_obs[x, "adm2"] <- "Laisamis"
+    svy_obs[x, "adm1"] <- "Marsabit"
     svy_obs[x, "stratum"] <- 1
 
     # Add other metavariables
