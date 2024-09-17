@@ -28,6 +28,7 @@
       "mnh_access" = c("adm2", "prop_sba"),
       "morbidity_df" = c("adm1", "year", "month", 
         grep("_3m|_6m", colnames(morbidity_df), value = T)),
+      "ndvi" = c("adm2","year","month",grep("_3m|_6m",colnames(ndvi),value=T)),
       "prices_df" = c("adm2", "year", "month", "price_sm", 
         grep("_3m|_6m", colnames(prices_df), value = T)),
       "sam_cases_df" = c("adm2", "year", "month", "sam_admissions_rate", 
@@ -88,21 +89,23 @@
       max = NA
     )
     
-    # Compute and save characteristics for each predictor
+    # Compute haracteristics for each predictor
     for (i in 1:nrow(out)) {
       
       # which variable:
       x <- out[i, "variable"]
       
       # proportion of zero values:
-      out[i, "prop_nonzero"] <- prop.table(table(preds[, x] == 0))[1]
+      out[i, "prop_nonzero"] <- percent(prop.table(table(preds[,x]==0))[1],0.1)
 
       # statistics:
-      out[i, "mean"] <- round(mean(preds[, x], na.rm = T), 3)
-      out[i, "median"] <- round(median(preds[, x], na.rm = T), 3)
-      out[i, "min"] <- round(min(preds[, x], na.rm = T), 3)
-      out[i, "max"] <- round(max(preds[, x], na.rm = T), 3)
+      out[i, "mean"] <- round(mean(preds[, x], na.rm = T), 1)
+      out[i, "median"] <- round(median(preds[, x], na.rm = T), 1)
+      out[i, "min"] <- round(min(preds[, x], na.rm = T), 1)
+      out[i, "max"] <- round(max(preds[, x], na.rm = T), 1)
     } 
+    
+    # Save
     write.csv(out, paste0(dir_path, "out/03_characteristics_preds.csv"), 
       row.names = F)
     
@@ -199,6 +202,7 @@
     # Also save predictors dataset
     saveRDS(preds, paste0(dir_path, "out/03_preds.rds"))        
 
+    
 #...............................................................................  
 ### ENDS
 #...............................................................................

@@ -21,6 +21,9 @@
     # Identify outcomes
     outcomes <- c("sam", "gam", "zwfl", "zac")
     
+    # Factorise county as a possible random effect
+    obs$adm1 <- factor(obs$adm1)
+    
     # Identify categorical and non-categorical predictors
     x <- c("adm1", "adm2", "year", "month", "id", "stratum_id", "cluster", 
       "sex", "age", "quality_score", "zwfl", "zac", "gam", "sam")
@@ -31,6 +34,7 @@
     # Two predictors (ANC and OPD utilisation) don't go as far as 2019 - exclude
     x <- grep("opd_|anc_", colnames(obs), value = T)
     obs <- obs[, ! colnames(obs) %in% x]
+    df_preds <- df_preds[, ! colnames(df_preds) %in% x]
     preds <- preds[! preds %in% x]
     preds_cont <- preds_cont[! preds_cont %in% x]
     preds_cat <- preds_cat[! preds_cat %in% x]
@@ -48,10 +52,10 @@
     df <- reshape(df, direction = "long", varying = x, idvar = c("adm1", "date"),
       timevar = "predictor", times = x, v.names = "mean")
     df$predictor <- factor(df$predictor, levels = sort(unique(df$predictor)),
-      labels = c("ANC rate", "cholera", "DPT cov.", "insec. events", 
-        "insec. deaths", "malaria", "MAM cases", "measles", "MMR cov.",
-        "OPD util.", "maize price", "literacy", "safe births", "SAM cases",
-        "schooling", "rainfall"))
+      labels = c("cholera", "DPT cov.", "insec. events", 
+        "insec. deaths", "malaria", "MAM cases", "measles", "MMR cov.", "NDVI",
+        "maize price", "literacy", "safe births", "SAM cases",
+        "schooling", "SNDVI", "rainfall"))
     
     # Visualise trends
     ggplot(df, aes(x = date, y = mean, colour = adm1)) +
@@ -61,6 +65,8 @@
       scale_y_continuous("mean predictor value") +
       theme_bw() +
       facet_grid(predictor~adm1, scales = "free_y") +
+      annotate("rect", xmin=as.Date("2016-10-01"), xmax=as.Date("2017-12-31"), 
+        ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "firebrick") +
       theme(legend.position = "none", axis.text.x = element_text(angle = 30,
         hjust = 1, vjust = 1))
     ggsave(paste0(dir_path, "out/04_predictor trends.png"), units = "cm",
@@ -145,6 +151,7 @@
     }
 
     # Save univariate output
+    out_unit <- out_uni[order(out_uni$outcome, out_uni$aic_glm), ]
     write.csv(out_uni, paste0(dir_path, "out/04_univariate.csv"), row.names = F)
     
     # Visualise goodness of fit, by outcome and predictor
@@ -157,7 +164,7 @@
       df$outcome <- factor(df$outcome, levels = sort(unique(df$outcome)),
         labels = c("SAM", "GAM", "WHZ", "MUACZ"))
       df$model <- factor(df$model, levels = c("glm", "gam"), 
-        labels = c("GLM", "GAM"))
+        labels = c("generalised linear model", "generalised additive model"))
       df$outcome2 <- paste0(df$outcome, " (", df$model, ")")
       x <- aggregate(list(aic_min = df$aic), by = list(outcome = df$outcome),
         min, na.rm = T)
@@ -166,10 +173,10 @@
       
       # plot difference in AIC from lowest AIC in outcome-predictor combination
       ggplot(df, aes(x = predictor, y = aic, colour = model, shape = model)) +
-        geom_point(size = 2, alpha = 0.5, fill = NA, stroke = 2) +
+        geom_point(size = 2.5, alpha = 0.75, fill = NA, stroke = 1.25) +
         scale_y_continuous("Akaike Information Criterion value") +
-        scale_colour_manual("model", values = palette_gen[c(6,12)]) +
-        scale_shape_manual("model", values = c(0, 2)) +
+        scale_colour_manual("", values = palette_gen[c(6,12)]) +
+        scale_shape_manual("", values = c(0, 2)) +
         facet_grid(outcome ~ ., scales = "free_y") +
         theme_bw() +
         theme(legend.position = "top", axis.text.x = element_text(angle = 30, 
@@ -193,7 +200,7 @@
     # Number of folds (= all stratum_id's if "all" == LOOCV)
     n_units <- length(unique(df$stratum_id))
     n_k <- ifelse(n_folds == "all", n_units, n_folds)
-
+    
     # Shuffle dataset
     x <- data.frame(stratum_id = unique(df$stratum_id), 
       rank = sample.int(n = n_units, size = n_units))
@@ -216,33 +223,67 @@
       if (verbose) {print(paste0("fold ", ff, " of ", nrow(out)))}
       
       # identify fold observations
-      x <- which(df$rank %in% folds[out[ff, "fold"]])
+      x <- which(df$rank %in% unlist(folds[out[ff, "fold"]]))
 
       # add county and year
-      out[ff, "adm1"] <- unique(as.character(df[x, "adm1"]))
-      out[ff, "year"] <- unique(df[x, "year"])
+      out[ff, "adm1"] <- paste(unique(as.character(df[x, "adm1"])), 
+        collapse = ", ")
+      out[ff, "year"] <- paste(unique(df[x, "year"]), collapse = ", ")
       
-      # try to refit model on training dataset; if no fit, go to next fold
-      m_ff <- try(update(model_f, data = df[-x, ]))
-      if (class(m_ff)[1] == "try-error") {
-        out[ff, "fold_ok"] <- F
-        next}
-
-      # try to predict on validation dataset; if cannot predict, go to next fold
-      pred <- try(predict(m_ff, newdata = df[x, ], type = "response", 
-        allow.new.levels = T))
-      if (class(preds)[1] == "try-error" | all(is.na(pred))) {
-        out[ff, "fold_ok"] <- F
-        next}
+      # if the model is a random forest...
+      if (class(model_f)[1] == "ranger") {
+        
+        # update dataset
+        obs_rf <- na.omit(df[-x, ])
+        
+        # try to refit model on training dataset; if no fit, go to next fold
+        m_ff <- try(eval(model_f$call))
+        if (class(m_ff)[1] == "try-error") {
+          out[ff, "fold_ok"] <- F
+          next}
+        
+        # try to predict on validation dataset; if cannot, go to next fold
+        obs_rf_fold <- na.omit(df[x, ])
+        if (nrow(obs_rf_fold) > 0) {
+          pred <- try(
+            predict(m_ff, data = obs_rf_fold,type = "response")$predictions)
+          if (class(pred)[1] == "try-error" | all(is.na(pred))) {
+            out[ff, "fold_ok"] <- F
+            next}
+        }
+        if (nrow(obs_rf_fold) == 0) {out[ff, "fold_ok"] <- F; next}
+        
+        # compute RMSE if prediction was successful
+        out[ff, "rmse"] <- sqrt(mean((obs_rf_fold[, my] - pred)^2, na.rm = T))
+        
+        # compute mean observed and predicted, and number of observations in fold
+        out[ff, "obs"] <- mean(obs_rf_fold[, my], na.rm = T)
+        out[ff, "pred"] <- mean(pred, na.rm = T)
+        out[ff, "prop_folded"] <- nrow(obs_rf_fold) / nrow(na.omit(df))
+      }
       
-      # compute RMSE if prediction was successful
-      out[ff, "rmse"] <- sqrt(mean((df[x, my] - pred)^2, na.rm = T))
-      
-      # compute mean observed and predicted, and number of observations in fold
-      out[ff, "obs"] <- mean(df[x, my], na.rm = T)
-      out[ff, "pred"] <- mean(pred, na.rm = T)
-      out[ff, "prop_folded"] <- nrow(df[x, ]) / nrow(df)
-      
+      if (class(model_f)[1] == "bam") {
+        # try to refit model on training dataset; if no fit, go to next fold
+        m_ff <- try(update(model_f, data = df[-x, ]))
+        if (class(m_ff)[1] == "try-error") {
+          out[ff, "fold_ok"] <- F
+          next}
+        
+        # try to predict on validation dataset; if cannot, go to next fold
+        pred <- try(predict(m_ff, newdata = df[x, ], type = "response", 
+          allow.new.levels = T))
+        if (class(pred)[1] == "try-error" | all(is.na(pred))) {
+          out[ff, "fold_ok"] <- F
+          next}
+        
+        # compute RMSE if prediction was successful
+        out[ff, "rmse"] <- sqrt(mean((df[x, my] - pred)^2, na.rm = T))
+        
+        # compute mean observed and predicted, and number of observations in fold
+        out[ff, "obs"] <- mean(df[x, my], na.rm = T)
+        out[ff, "pred"] <- mean(pred, na.rm = T)
+        out[ff, "prop_folded"] <- nrow(df[x, ]) / nrow(df)
+      }
     }
 
     # Output results as desired: just mean CV scores, or results per fold
@@ -252,8 +293,9 @@
       return(x)
     } 
     else {
-      out_cv <- list(family = as.character(family(m_try))[1],
-        out = out)
+      out_cv <- list(outcome = my, family = NA, out = out)
+      if (class(model_f)[1] == "ranger") {out_cv$family <- "rf"} else
+        {out_cv$family <- as.character(family(model_f))[1]}
       return(out_cv)
     }
   }
@@ -261,35 +303,40 @@
   
   #...................................      
   ## Plot cross-validation results for a given model
-  f_cv_plot <- function(out_cv_f = out_cv, print = T, save = T,
-    filename = "04_cv_results.png", dir_path_f = dir_path,
-    height_f = 15, width_f = 15) {
+  f_cv_plot <- function(out_cv_f = out_cv, print = T, save = T, return = F,
+    dir_path_f = dir_path, height_f = 15, width_f = 15) {
     
     # Remove NA values
     df <- na.omit(out_cv_f$out)
     
+    # Set thresholds for plot visualisation
+    if (out_cv_f$outcome=="gam"){t1 <- 0.02; t2 <- 0.05; t3 <- 0.15; t4 <- 0.20}
+    if (out_cv_f$outcome=="sam"){t1 <- 0.01; t2 <- 0.02; t3 <- 0.02; t4 <- 0.05}
+    if (out_cv_f$outcome=="zwfl"){t1 <- 0.10;t2 <- 0.25;t3 <- -1.00;t4 <- -1.25}
+    if (out_cv_f$outcome=="zac"){t1<- 0.10; t2 <- 0.25; t3 <- -1.00;t4 <- -1.25}
+    
     # Set plot limits, axis breaks and precision ribbons, depending on model
-    if (out_cv_f$family == "binomial") {
-      limits <- c(0, max(c(df$obs, df$pred), na.rm = T) + 0.05)
-      breaks = seq(0, 1, 0.05)
+    if (out_cv_f$outcome %in% c("gam", "sam")) {
+      limits <- c(0, max(c(df$obs, df$pred), na.rm = T) + t2)
+      breaks = seq(0, 1, t2)
       ribbons <- data.frame(observed = seq(min(df$obs) - 0.1, max(df$obs) + 0.1, 
         0.01))
-      ribbons$minus_a <- ribbons$observed - 0.02
-      ribbons$minus_b <- ribbons$observed - 0.05
-      ribbons$plus_a <- ribbons$observed + 0.02
-      ribbons$plus_b <- ribbons$observed + 0.05
     }
-    if (out_cv_f$family == "gaussian") {
-      limits <- c(min(c(df$obs, df$pred), na.rm = T) - 0.2, 
-        max(c(df$obs, df$pred), na.rm = T) + 0.2)
-      breaks = seq(round(limits[1]) - 0.1, round(limits[2], 1) + 0.1, 0.1)
+    if (out_cv_f$outcome %in% c("zwfl", "zac")) {
+      limits <- c(min(c(df$obs, df$pred), na.rm = T) - t2, 
+        max(c(df$obs, df$pred), na.rm = T) + t2)
+      breaks = seq(round(limits[1], 1), round(limits[2], 1), 0.1)
       ribbons <- data.frame(observed = seq(min(df$obs), max(df$obs), 0.10))
-      ribbons$minus_a <- ribbons$observed - 0.05
-      ribbons$minus_b <- ribbons$observed - 0.20
-      ribbons$plus_a <- ribbons$observed + 0.05
-      ribbons$plus_b <- ribbons$observed + 0.20
     }
+    ribbons$minus_a <- ribbons$observed - t1
+    ribbons$minus_b <- ribbons$observed - t2
+    ribbons$plus_a <- ribbons$observed + t1
+    ribbons$plus_b <- ribbons$observed + t2
 
+    # Set precision area colour
+    if (out_cv_f$family == "rf") {ribbon_col <- "seagreen3"} else
+      {ribbon_col <- "firebrick"}
+    
     # Generate plot
     pl <- ggplot() +
       geom_point(data = df, aes(x = obs, y = pred, fill = adm1, colour = adm1,
@@ -297,45 +344,195 @@
       theme_bw() +
       scale_x_continuous("observed", limits = limits, 
         breaks = breaks, expand = c(0,0),
-        labels = ifelse(out_cv_f$family == "binomial", 
+        labels = ifelse(out_cv_f$outcome %in% c("gam", "sam"), 
           scales::percent, scales::label_number(accuracy = 0.01))) +
       scale_y_continuous("predicted", limits = limits, 
         breaks = breaks, expand = c(0,0),
-        labels = ifelse(out_cv_f$family == "binomial",
+        labels = ifelse(out_cv_f$outcome %in% c("gam", "sam"),
           scales::percent, scales::label_number(accuracy = 0.01))) +
-      theme(legend.position = "top") +
+      theme(legend.position = "top", panel.grid.minor = element_blank()) +
       scale_fill_viridis_d("county") +
       scale_colour_viridis_d("county") +
-      geom_abline(intercept = 0, slope = 1, linetype = "11",
-        colour = "firebrick") +
+      geom_abline(intercept = 0,slope = 1,linewidth = 0.5,colour = ribbon_col) +
       guides(size = "none") +
       geom_ribbon(data = ribbons,aes(x = observed,ymin = minus_a,ymax = plus_a),
-        alpha = 0.10, fill = "firebrick") +
+        alpha = 0.10, fill = ribbon_col) +
       geom_ribbon(data = ribbons,aes(x = observed,ymin = minus_b,ymax = plus_b),
-        alpha = 0.05, fill = "firebrick")
+        alpha = 0.05, fill = ribbon_col) +
+      geom_vline(xintercept = t3, colour = palette_gen[6], 
+        linetype = "22", linewidth = 1) +
+      geom_hline(yintercept = t3, colour = palette_gen[6], 
+        linetype = "22", linewidth = 1) +
+      geom_vline(xintercept = t4, colour = palette_gen[13], 
+        linetype = "11", linewidth = 1) +
+      geom_hline(yintercept = t4, colour = palette_gen[13], 
+        linetype = "11", linewidth = 1)
 
-    # Print and/or save
+    # Print and/or save and/or return
     if (print) {print(pl)}
-    if (save) {ggsave(paste0(dir_path_f, "out/", filename), units = "cm",
-      dpi = "print", height = height_f, width = width_f)}
+    if (save) {
+      if (out_cv_f$family == "rf") {x <- "out/04_cv_results_rf"} else
+        {x <- "out/04_cv_results_glm"}
+      ggsave(paste0(dir_path_f, x, "_", out_cv_f$outcome, ".png"), units = "cm", 
+        dpi = "print", height = height_f, width = width_f)}
+    if (return) {return(pl)}
   }
   
 
- 
+  #...................................      
+  ## Gather up summary output for any given model
+  f_out <- function(out_cv_f = out_cv, model_f = m_try) {
+    
+    # Set up output
+    out <- c()
+    
+    # Populate output
+    out$outcome <- unlist(out_cv_f$outcome)
+    out$family <- unlist(out_cv_f$family)
+    x <- all.vars(formula(m_try))
+    out$predictors <- paste(x[2:length(x)], collapse = ", ")
+    out$formula <- as.character(m_try$formula)[3]
+    if (out_cv_f$family == "rf") {out$aic <- NA} else {out$aic <- AIC(model_f)}
+    x <- out_cv_f$out
+    out$n_folds <- nrow(x)
+    out$prop_folds_ok <- percent(mean(x$fold_ok), 0.1)
+    out$mean_abs_bias <- ifelse(out$outcome %in% c("gam", "sam"),
+      percent(mean(x$pred - x$obs, na.rm = T), 0.1),
+      round(mean(x$pred - x$obs, na.rm = T), 2))
+    out$mean_abs_error <- ifelse(out$outcome %in% c("gam", "sam"),
+      percent(mean(abs(x$pred - x$obs), na.rm = T), 0.1),
+      round(mean(abs(x$pred - x$obs), na.rm = T), 2))
+    if (out$outcome == "gam") {t1 <- 0.02; t2 <- 0.05; t3 <- 0.15; t4 <- 0.20}
+    if (out$outcome == "sam") {t1 <- 0.01; t2 <- 0.02; t3 <- 0.02; t4 <- 0.05}
+    if (out$outcome == "zwfl") {t1 <- 0.10; t2 <- 0.25; t3 <- -1.00;t4 <- -1.25}
+    if (out$outcome == "zac") {t1 <- 0.10; t2 <- 0.25; t3 <- -1.00;t4 <- -1.25}
+    for (i in c(t1, t2)) {
+      num <- length(which(abs(x$pred - x$obs) < i))
+      denom <- nrow(na.omit(x))
+      out[paste0("prop_within_", i)] <- paste0(percent(num/denom, 0.1), " (",
+        num, "/", denom, ")")
+    }
+    for (i in c(t3, t4)) {
+      if (out$outcome %in% c("gam", "sam")) {
+        num <- length(which(x$obs >= i & x$pred >= i))
+        denom <- length(which(x$obs >= i))
+      }
+      if (out$outcome %in% c("zwfl", "zac")) {
+        num <- length(which(x$obs < i & x$pred < i))
+        denom <- length(which(x$obs < i))
+      }
+      out[paste0("sens_", i)] <- paste0(percent(num/denom, 0.1), " (", num,
+        "/", denom, ")")
+    }
+
+    # Return output
+    x <- data.frame(characteristic = names(out))
+    x$value <- unlist(out)
+    return(x)
+  }
+    
+    
+
 #...............................................................................
-### Evaluating Global Acute Malnutrition (GAM) models
+### Evaluating models
 #...............................................................................
 
   #...................................      
-  ## Models
-  obs$adm1 <- factor(obs$adm1)
-  m_try <- bam(gam ~ s(spi_6m) + s(dpt3_rate_6m) + s(adm1, bs = "re"), 
-    data = obs, family = "binomial")
-  AIC(m_try)  
+  ## Global Acute Malnutrition (GAM)
+    
+    # GLM/GAM
+    m_try <- bam(gam ~ spi_6m + dpt3_rate_6m + s(ndvi_6m) + 
+      sam_admissions_rate_6m_cat, data = obs, family = "binomial")
+    summary(m_try)
+    out_cv <- f_cv(n_folds = "all")
+    f_cv_plot()
+    out_summary <- suppressWarnings(f_out())   
+    out_summary
+  
+    # Random forest
+    obs_rf <- na.omit(obs)
+    form <- as.formula(paste0("gam", " ~ ", paste(preds, collapse = " + ")))
+    m_try <- ranger(formula = form, data = obs_rf, num.trees = 1000, mtry = 3)
+    m_try
+    out_cv <- f_cv(n_folds = "all")
+    f_cv_plot()
+    out_summary <- suppressWarnings(f_out())   
+    out_summary
 
-  out_cv <- f_cv()
-  f_cv_plot()
+  
+  #...................................      
+  ## Severe Acute Malnutrition (GAM)
+    
+    # GLM/GAM
+    m_try <- bam(sam ~ spi_6m + dpt3_rate_6m + s(ndvi_6m) + 
+      sam_admissions_rate_6m_cat, data = obs, family = "binomial")
+    summary(m_try)
+    out_cv <- f_cv(n_folds = "all")
+    f_cv_plot()
+    out_summary <- suppressWarnings(f_out())   
+    out_summary
+  
+    # Random forest
+    obs_rf <- na.omit(obs)
+    form <- as.formula(paste0("sam", " ~ ", paste(preds, collapse = " + ")))
+    m_try <- ranger(formula = form, data = obs_rf, num.trees = 1000, mtry = 3)
+    m_try
+    out_cv <- f_cv(n_folds = "all")
+    f_cv_plot()
+    out_summary <- suppressWarnings(f_out())   
+    out_summary
       
+    
+  #...................................      
+  ## Weight-for-Height Z-Score
+    
+    # GLM/GAM
+    m_try <- bam(zwfl ~ spi_6m + dpt3_rate_6m + s(ndvi_6m) + 
+      sam_admissions_rate_6m_cat, data = obs, family = "gaussian")
+    summary(m_try)
+    out_cv <- f_cv(n_folds = "all")
+    f_cv_plot()
+    out_summary <- suppressWarnings(f_out())   
+    out_summary
+  
+    # Random forest
+    obs_rf <- na.omit(obs)
+    form <- as.formula(paste0("zwfl", " ~ ", paste(preds, collapse = " + ")))
+    m_try <- ranger(formula = form, data = obs_rf, num.trees = 1000, mtry = 3)
+    m_try
+    out_cv <- f_cv(n_folds = "all")
+    f_cv_plot()
+    out_summary <- suppressWarnings(f_out())   
+    out_summary
+    
+
+  #...................................      
+  ## Weight-for-Height Z-Score
+    
+    # GLM/GAM
+    m_try <- bam(zac ~ spi_6m + dpt3_rate_6m + s(ndvi_6m) + 
+      sam_admissions_rate_6m_cat, data = obs, family = "gaussian")
+    summary(m_try)
+    out_cv <- f_cv(n_folds = "all")
+    f_cv_plot()
+    out_summary <- suppressWarnings(f_out())   
+    out_summary
+  
+    # Random forest
+    obs_rf <- na.omit(obs)
+    form <- as.formula(paste0("zac", " ~ ", paste(preds, collapse = " + ")))
+    m_try <- ranger(formula = form, data = obs_rf, num.trees = 1000, mtry = 3)
+    m_try
+    out_cv <- f_cv(n_folds = "all")
+    f_cv_plot()
+    out_summary <- suppressWarnings(f_out())   
+    out_summary
+    write.csv(out_summary, paste0(dir_path, "out/04_perf_", out_cv$outcome, "_",
+      out_cv$family, ".csv"), row.names = F)
+    
+        
+# + s(adm1, bs = "re")  
+  
 #...............................................................................  
 ### ENDS
 #...............................................................................

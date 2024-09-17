@@ -459,6 +459,36 @@
       dpi = "print", height = 23, width = 17)
      
 
+  #...................................      
+  ## Graph survey data availability by sub-county
+    
+    # Prepare data
+    x <- table(svy_obs$adm2)
+    x <- data.frame(adm2 = names(x), n_obs = as.vector(x))
+    df <- merge(shp_adm2_trans, x, by = "adm2", all.x = T)
+    df[which(is.na(df$n_obs)), "n_obs"] <- 0
+        
+    # Produce a map of counties and subcounties, shaded based on n observations
+    ggplot() +
+      geom_sf(data = df, aes(fill = n_obs), lwd = 0.25, colour = "grey80", 
+        alpha = 0.8) +
+      geom_sf(data = shp_adm1_trans, lwd = 0.5, colour = "grey20", 
+        alpha = 0.3, fill = NA) +
+      geom_sf_text(data = df, aes(label = adm2), 
+        colour = "black", size = 1.5) +
+      geom_sf_label(data = shp_adm1_trans, aes(label = adm1), size = 2, 
+        colour = "black", alpha = 0.5,
+        nudge_y = c(-0.1,0,0,0,0,0,-0.2,0.2,0,-0.2)) +
+      theme_bw() +
+      theme(axis.title = element_blank(), legend.position = "top",
+        axis.text = element_text(size = 6), 
+        legend.text = element_text(size = 6), 
+        legend.title = element_text(size = 6)) +
+      scale_fill_gradient(name = "number of observations", 
+        low = "white", high = palette_gen[6])
+    ggsave(paste0(dir_path, "out/02_map_obs.png"), height = 15, width = 15, 
+      units = "cm", dpi = 300)
+    
        
 #...............................................................................  
 ### ENDS

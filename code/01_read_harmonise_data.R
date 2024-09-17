@@ -75,6 +75,7 @@
     # Prepare output
     pop <- expand.grid(adm2 = admin$adm2, year = 2015:2019, month = 1:12, 
       pop = NA)
+    pop$adm2 <- as.character(pop$adm2)
     pop <- pop[order(pop$adm2), ]
     
     # For each year...  
@@ -186,7 +187,82 @@
       mnh_access <- data.frame(adm2 = shp_adm2_mnh$adm2, prop_sba =
         exact_extract(mnh_access, shp_adm2_mnh, "mean"))
     
+
+  #...................................      
+  ## Read and prepare monthly (standardised) NDVI data
+  if (! file.exists(paste0(dir_path, "in/ndvi.rds"))) {     
+    # Prepare output to hold data
+    ndvi <- expand.grid(adm2 = admin$adm2, year = 2014:2019, month = 1:12, 
+      ndvi = NA)
+    ndvi$adm2 <- as.character(ndvi$adm2)
+    ndvi <- ndvi[order(ndvi$adm2), ]
+    ndvi[, c("ndvi", "sndvi")] <- NA
       
+    # For each year...
+    for (i in 2014:2019) {
+
+      #...and month
+      for (j in 1:12) {
+        
+        # process NDVI data      
+          # read tiff raster file with NDVI
+          x <- paste0(dir_path, "in/ndvi/", i, sprintf("%02d", j), 
+            "01_vgt-ndvi_monndvi_SPOTV-Africa-1km_vgt-pv-olci_KEN.TIF")
+          df <- terra::rast(x)
+        
+          # make sure the admin shapefile has the same projection
+          shp_adm2_ndvi <- st_transform(shp_adm2, terra::crs(df))
+          shp_adm2_ndvi <- shp_adm2_ndvi[order(shp_adm2_ndvi$adm2), ]
+  
+          # clip and mask to restrict to subcounties of interest
+          df <- terra::crop(x = df, y = shp_adm2_ndvi)
+          df <- raster::mask(x = df, mask = shp_adm2_ndvi)
+            
+          # take means for each subcounty and add to output
+          ndvi[which(ndvi$year == i & ndvi$month == j), "ndvi"] <- 
+            exact_extract(df, shp_adm2_ndvi, "mean")
+      
+      # process SNDVI data
+        # read tiff raster file with standardised NDVI
+        x <- paste0(dir_path, "in/ndvi/", i, sprintf("%02d", j), 
+          "01_vgt-ndvi_1monsndvi_SPOTV-Africa-1km_vgt-pv-olci_KEN.TIF")
+        df <- terra::rast(x)
+        
+          # make sure the admin shapefile has the same projection
+          shp_adm2_ndvi <- st_transform(shp_adm2, terra::crs(df))
+  
+          # clip and mask to restrict to subcounties of interest
+          df <- terra::crop(x = df, y = shp_adm2_ndvi)
+          df <- raster::mask(x = df, mask = shp_adm2_ndvi)
+            
+          # take means for each subcounty and add to output
+          ndvi[which(ndvi$year == i & ndvi$month == j), "sndvi"] <- 
+            exact_extract(df, shp_adm2_ndvi, "mean")
+      }
+    }  
+    
+    # Save file
+    saveRDS(ndvi, paste0(dir_path, "in/ndvi.rds"))
+  }
+
+    # Source NDVI data
+    ndvi <- readRDS(paste0(dir_path, "in/ndvi.rds"))
+      
+    # Add 3- and 6-monthly rolling NDVI means, aligned right
+    x <- by(ndvi, ndvi$adm2, function(x) {rollmean(x$ndvi, k = 3, align="right",
+      na.pad = T)})
+    ndvi$ndvi_3m <- as.vector(unlist(x))
+    x <- by(ndvi, ndvi$adm2, function(x) {rollmean(x$ndvi, k = 6, align="right",
+      na.pad = T)})
+    ndvi$ndvi_6m <- as.vector(unlist(x))
+    x <- by(ndvi, ndvi$adm2, function(x) {rollmean(x$sndvi, k = 3,align="right",
+      na.pad = T)})
+    ndvi$sndvi_3m <- as.vector(unlist(x))
+    x <- by(ndvi, ndvi$adm2, function(x) {rollmean(x$sndvi, k = 6,align="right",
+      na.pad = T)})
+    ndvi$sndvi_6m <- as.vector(unlist(x))
+
+                
   #...................................      
   ## Read and prepare monthly standardised precipitation index, from CHIRPS data
   if (! file.exists(paste0(dir_path, "in/spi.rds"))) {    
@@ -219,14 +295,17 @@
     gunzip(x)
     df <- terra::rast(gsub(".gz", "", x))
     shp_adm2_chirps <- st_transform(shp_adm2, terra::crs(df))
+    shp_adm2_chirps <- shp_adm2_chirps[order(shp_adm2_chirps$adm2), ]
     file.remove(gsub(".gz", "", x))
     rm(df)
     
     # Prepare output
     spi <- expand.grid(adm2_pcode= shp_adm2$adm2_pcode, file = file_names_unzip)
+    spi$adm2_pcode <- as.character(spi$adm2_pcode)
     spi$year <- as.integer(substr(spi$file, 13, 16))
     spi$month <- as.integer(substr(spi$file, 18, 19))
     spi$rainfall <- NA
+    spi <- spi[order(spi$file, spi$adm2_pcode), ]
 
     # Download and process each CHIRPS monthly file
     for (i in seq_along(file_urls)) {
@@ -286,37 +365,6 @@
       na.pad = T)})
     spi$spi_6m <- as.vector(unlist(x))
 
-  
-  # #...................................      
-  # ## Read and prepare monthly NDVI index, from MODIS data
-  #   
-  #   MODIStsp_get_prodnames()
-  #   MODIStsp_get_prodlayers("M*D13A3")
-  #  
-  #   st_write(shp_adm2[which(shp_adm2$adm2 == "Tiaty"), ], 
-  #     paste0(dir_path, "in/ndvi/tiaty.shp")) 
-  # 
-  #   
-  #   MODIStsp(
-  #     gui = F,
-  #     out_folder = paste0(dir_path, "in/ndvi"),
-  #     selprod = "Vegetation_Indexes_Monthly_1Km (M*D13A3)",
-  #     bandsel = "NDVI",
-  #     user = "francescochecchi",
-  #     password = "Kenya_Malnut2024!",
-  #     start_date = "2015.01.01",
-  #     end_date = "2015.12.31",
-  #     spatmeth = "file",
-  #     spafile = paste0(dir_path, "in/ndvi/tiaty.shp"),
-  #     parallel = F,
-  #     out_format = "GTiff",
-  #     out_projsel = "User Defined",
-  #     output_prof = "4326",
-  #     scale_val = F,
-  #     verbose = T
-  #   )
-
-      
     
     
 #...............................................................................
@@ -460,7 +508,7 @@
     
     # Which datasets
     x <- c("insecurity", "mam_cases", "morbidity", "pop", "prices", "sam_cases",
-      "spi", "surveys", "utilisation", "vaccination")
+      "spi", "ndvi", "surveys", "utilisation", "vaccination")
     
     # For each dataset...
     for (i in x) {

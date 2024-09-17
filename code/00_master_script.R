@@ -33,6 +33,7 @@
       mgcv,          # Fit generalised additive models
       parallel,      # Speed up code implementation
       psych,         # Implement Principal Components Analysis
+      ranger,        # Grow random forest machine learning models
       readxl,        # Read Excel files
       remotes,       # Install packages from github
       R.utils,       # Unzip .gz files
@@ -46,13 +47,7 @@
       viridis,       # Colour-blind palette
       zoo)           # Compute running means
 
-    # # Install and load other packages not available from CRAN
-    #   # package to download and manage NDVI data
-    #   remotes::install_github("francescochecchi/MODIStsp", force = T)
-    #   library(MODIStsp)
-    #     # repo was merged with pull request 'devel' from user 'pkautio'
 
-    
   #...................................      
   ## Starting setup
 
