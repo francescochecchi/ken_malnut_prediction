@@ -8,6 +8,7 @@ The following input datasets are included in the `\in` directory of the reposito
 * `ken_predictor_data.xlsx`, each worksheet of which contains a single predictor dataset. the `metadata` tab lists each worksheet (predictor) and its characteristics, and is read by R so as to then read the individual worksheets. More detail on each dataset is provided in the paper;
 * `ken_other_data.xlsx`, which contains in each worksheet other datasets needed for the analysis, again listed in a `metadata` worksheet;
 * `admin_boundaries.zip`, which users should unzip to a `in\admin-boundaries\` sub-directory. This file contains shape files delineating county and sub-county boundaries for Kenya;
+
 A few additional predictor datasets are not uploaded to the repository due to their large size. Users should therefore download them first, as follows:
 * normalised difference vegetation index (NDVI) data should be downloaded from [https://gmes.icpac.net/data-center/vgt-ndvi] to a `in\ndvi\` sub-directory. The data platform requires users to sign up and request specific data for download, which they will then receive an email link for. Users should select the 'Monthly NDVI' and 'Monthly SNDVI (Anomaly)' products from 2014 to 2019 in GeoTiff format for all of Kenya. The download will be a single zipped file. Users should unzip this file to the above sub-directory.
 * Data on estimated access to safe assisted births should be downloaded from [https://hub.worldpop.org/geodata/summary?id=1263] to a `in\mnh_access\` sub-directory. The R script reading the data will unzip this file;
