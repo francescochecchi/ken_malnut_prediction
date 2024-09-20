@@ -16,7 +16,7 @@ A few additional predictor datasets are not uploaded to the repository due to th
 * Rainfall data will be downloaded automatically by one of the R scripts.
 
 ## R scripts
-The `00_master_script.R` code installs and/or loads required R packages, initialises certain parameters and then sources each of the following scripts in order. 
+The `00_master_script.R` code installs and/or loads required R packages, initialises certain parameters and then sources each of the following scripts in order:
 * `01_read_harmonise_data.R` reads all the datasets, calculates additional variables, standardises place names and dates and prepares predictor datasets for merging;
 * `02_prepare_survey_data.R` prepares, merges and describes individual survey data, while also generating descriptive tables and graphs;
 * `03_merge_categorise_predictors.R` merges all datasets together into one file and explores the distributions of predictors, categorising them if needed;
