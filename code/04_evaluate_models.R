@@ -31,13 +31,14 @@
     preds_cat <- grep("_cat", preds, value = T)    
     preds_cont <- preds[! preds %in% preds_cat]
     
-    # Two predictors (ANC and OPD utilisation) don't go as far as 2019 - exclude
-    x <- grep("opd_|anc_", colnames(obs), value = T)
+    # Three predictors (ANC, OPD utilisation, malaria) are incomplete - exclude
+    x <- grep("opd_|anc_|malaria", colnames(obs), value = T)
     obs <- obs[, ! colnames(obs) %in% x]
-    df_preds <- df_preds[, ! colnames(df_preds) %in% x]
     preds <- preds[! preds %in% x]
     preds_cont <- preds_cont[! preds_cont %in% x]
     preds_cat <- preds_cat[! preds_cat %in% x]
+    x <- grep("opd_|anc_|malaria", colnames(df_preds), value = T)
+    df_preds <- df_preds[, ! colnames(df_preds) %in% x]
     
     # Aggregate to county-date level, taking the means (only 3m running means)
     df <- df_preds[, - grep("_cat|_6m", colnames(df_preds))]
@@ -53,7 +54,7 @@
       timevar = "predictor", times = x, v.names = "mean")
     df$predictor <- factor(df$predictor, levels = sort(unique(df$predictor)),
       labels = c("cholera", "DPT cov.", "insec. events", 
-        "insec. deaths", "malaria", "MAM cases", "measles", "MMR cov.", "NDVI",
+        "insec. deaths", "MAM cases", "measles", "MMR cov.", "NDVI",
         "maize price", "literacy", "safe births", "SAM cases",
         "schooling", "SNDVI", "rainfall"))
     
@@ -70,7 +71,7 @@
       theme(legend.position = "none", axis.text.x = element_text(angle = 30,
         hjust = 1, vjust = 1))
     ggsave(paste0(dir_path, "out/04_predictor trends.png"), units = "cm",
-      dpi = "print", height = 40, width = 30)    
+      dpi = "print", height = 38, width = 30)    
     
         
   #...................................      
@@ -151,7 +152,7 @@
     }
 
     # Save univariate output
-    out_unit <- out_uni[order(out_uni$outcome, out_uni$aic_glm), ]
+    out_uni <- out_uni[order(out_uni$outcome, out_uni$aic_glm), ]
     write.csv(out_uni, paste0(dir_path, "out/04_univariate.csv"), row.names = F)
     
     # Visualise goodness of fit, by outcome and predictor
@@ -174,7 +175,7 @@
       # plot difference in AIC from lowest AIC in outcome-predictor combination
       ggplot(df, aes(x = predictor, y = aic, colour = model, shape = model)) +
         geom_point(size = 2.5, alpha = 0.75, fill = NA, stroke = 1.25) +
-        scale_y_continuous("Akaike Information Criterion value") +
+        scale_y_continuous("difference in Akaike Information Criterion value") +
         scale_colour_manual("", values = palette_gen[c(6,12)]) +
         scale_shape_manual("", values = c(0, 2)) +
         facet_grid(outcome ~ ., scales = "free_y") +
@@ -182,7 +183,7 @@
         theme(legend.position = "top", axis.text.x = element_text(angle = 30, 
           hjust = 1, vjust = 1))
       ggsave(paste0(dir_path, "out/04_univariate.png"), units = "cm",
-        dpi = "print", height = 30, width = 20)
+        dpi = "print", height = 25, width = 20)
       
     
 #...............................................................................
@@ -437,102 +438,107 @@
 ### Evaluating models
 #...............................................................................
 
-  #...................................      
-  ## Global Acute Malnutrition (GAM)
-    
-    # GLM/GAM
-    m_try <- bam(gam ~ spi_6m + dpt3_rate_6m + s(ndvi_6m) + 
-      sam_admissions_rate_6m_cat, data = obs, family = "binomial")
-    summary(m_try)
-    out_cv <- f_cv(n_folds = "all")
-    f_cv_plot()
-    out_summary <- suppressWarnings(f_out())   
-    out_summary
-  
-    # Random forest
-    obs_rf <- na.omit(obs)
-    form <- as.formula(paste0("gam", " ~ ", paste(preds, collapse = " + ")))
-    m_try <- ranger(formula = form, data = obs_rf, num.trees = 1000, mtry = 3)
-    m_try
-    out_cv <- f_cv(n_folds = "all")
-    f_cv_plot()
-    out_summary <- suppressWarnings(f_out())   
-    out_summary
+  #...................................
+  ## Generalised linear/additive models
 
-  
-  #...................................      
-  ## Severe Acute Malnutrition (GAM)
-    
-    # GLM/GAM
-    m_try <- bam(sam ~ spi_6m + dpt3_rate_6m + s(ndvi_6m) + 
-      sam_admissions_rate_6m_cat, data = obs, family = "binomial")
-    summary(m_try)
+    # Global Acute Malnutrition (GAM)
+    m_try <- bam(gam ~ sndvi_6m + mam_admissions_rate_3m_cat + price_3m +
+      cholera_rate_3m_cat + events_rate_3m_cat + 
+      mmr1_rate_6m + prop_sba + spi_6m,
+      data = obs, family = "binomial")
     out_cv <- f_cv(n_folds = "all")
-    f_cv_plot()
-    out_summary <- suppressWarnings(f_out())   
-    out_summary
-  
-    # Random forest
-    obs_rf <- na.omit(obs)
-    form <- as.formula(paste0("sam", " ~ ", paste(preds, collapse = " + ")))
-    m_try <- ranger(formula = form, data = obs_rf, num.trees = 1000, mtry = 3)
-    m_try
-    out_cv <- f_cv(n_folds = "all")
-    f_cv_plot()
-    out_summary <- suppressWarnings(f_out())   
-    out_summary
-      
-    
-  #...................................      
-  ## Weight-for-Height Z-Score
-    
-    # GLM/GAM
-    m_try <- bam(zwfl ~ spi_6m + dpt3_rate_6m + s(ndvi_6m) + 
-      sam_admissions_rate_6m_cat, data = obs, family = "gaussian")
-    summary(m_try)
-    out_cv <- f_cv(n_folds = "all")
-    f_cv_plot()
-    out_summary <- suppressWarnings(f_out())   
-    out_summary
-  
-    # Random forest
-    obs_rf <- na.omit(obs)
-    form <- as.formula(paste0("zwfl", " ~ ", paste(preds, collapse = " + ")))
-    m_try <- ranger(formula = form, data = obs_rf, num.trees = 1000, mtry = 3)
-    m_try
-    out_cv <- f_cv(n_folds = "all")
-    f_cv_plot()
-    out_summary <- suppressWarnings(f_out())   
-    out_summary
-    
+    pl <- f_cv_plot(return = T)
+    assign(paste0("pl_glm_", out_cv$outcome), pl)    
+    out_summary <- suppressWarnings(f_out())
+    write.csv(out_summary, paste0(dir_path, "out/04_perf_", out_cv$outcome, "_",
+      out_cv$family, ".csv"), row.names = F)
 
-  #...................................      
-  ## Weight-for-Height Z-Score
-    
-    # GLM/GAM
-    m_try <- bam(zac ~ spi_6m + dpt3_rate_6m + s(ndvi_6m) + 
-      sam_admissions_rate_6m_cat, data = obs, family = "gaussian")
+    # Severe Acute Malnutrition (GAM)
+    m_try <- bam(sam ~ sndvi_6m + sam_admissions_rate_3m_cat + price_3m +
+      cholera_rate_3m_cat + events_rate_3m_cat + 
+      mmr1_rate_6m + prop_sba + spi_6m, data = obs, family = "binomial")
     summary(m_try)
     out_cv <- f_cv(n_folds = "all")
-    f_cv_plot()
-    out_summary <- suppressWarnings(f_out())   
-    out_summary
-  
-    # Random forest
-    obs_rf <- na.omit(obs)
-    form <- as.formula(paste0("zac", " ~ ", paste(preds, collapse = " + ")))
-    m_try <- ranger(formula = form, data = obs_rf, num.trees = 1000, mtry = 3)
-    m_try
-    out_cv <- f_cv(n_folds = "all")
-    f_cv_plot()
-    out_summary <- suppressWarnings(f_out())   
+    pl <- f_cv_plot(return = T)
+    assign(paste0("pl_glm_", out_cv$outcome), pl)    
+    out_summary <- suppressWarnings(f_out())
     out_summary
     write.csv(out_summary, paste0(dir_path, "out/04_perf_", out_cv$outcome, "_",
       out_cv$family, ".csv"), row.names = F)
+
+    # Weight-for-Height Z-Score
+    m_try <- bam(zwfl ~ s(sndvi_6m) + mam_admissions_rate_3m_cat + s(price_3m) +
+      cholera_rate_3m_cat + events_rate_3m_cat + 
+      s(mmr1_rate_6m) + prop_sba + s(spi_6m), data = obs, family = "gaussian")
+    summary(m_try)
+    out_cv <- f_cv(n_folds = "all")
+    pl <- f_cv_plot(return = T)
+    assign(paste0("pl_glm_", out_cv$outcome), pl)    
+    out_summary <- suppressWarnings(f_out())
+    write.csv(out_summary, paste0(dir_path, "out/04_perf_", out_cv$outcome, "_",
+      out_cv$family, ".csv"), row.names = F)
+
+    # MUAC-for-age Z-Score
+    m_try <- bam(zac ~ s(sndvi_6m) + mam_admissions_rate_3m_cat + s(price_3m) +
+      cholera_rate_3m_cat + events_rate_3m_cat + 
+      s(mmr1_rate_6m) + prop_sba + s(spi_6m), data = obs, family = "gaussian")
+    summary(m_try)
+    out_cv <- f_cv(n_folds = "all")
+    pl <- f_cv_plot(return = T)
+    assign(paste0("pl_glm_", out_cv$outcome), pl)    
+    out_summary <- suppressWarnings(f_out())
+    write.csv(out_summary, paste0(dir_path, "out/04_perf_", out_cv$outcome, "_",
+      out_cv$family, ".csv"), row.names = F)
+
+    # Combined performance graph
+    x <- lapply(ls(pattern = "pl_glm"), get)
+    ggarrange(plotlist = x, ncol = 2, nrow = 2, labels = 
+      c("global acute malnutrition", "severe acute malnutrition", 
+        "weight-for-height Z-score",
+        "middle-upper-arm circumference for age Z-score"), 
+      align = "hv", font.label = list(size = 11), label.y = 0.95, 
+      common.legend = T, hjust = c(-0.4,-0.4,-0.4,-0.21)) + 
+      bgcolor("white") + border(NA)
+    ggsave(paste0(dir_path, "out/04_glm_combi.png"), units = "cm", 
+      dpi = "print", height = 30, width = 30)    
+    
+  #...................................      
+  ## Random forest models
+    
+    # Select predictors and prepare data
+    preds_rf <- c("ndvi_6m", "mam_admissions_rate_3m_cat", "price_3m", 
+      "cholera_rate_3m_cat", "measles_rate_3m_cat", "events_rate_3m_cat", 
+      "mmr1_rate_6m", "dpt3_rate_6m", "prop_sba", "spi_6m", "prop_lit",
+      "schooling_cov")
+    obs_rf <- na.omit(obs[, c(outcomes, preds_rf)])
+    
+    # Grow random forest models for each of the four outcomes
+    for (i in outcomes) {
+      print(paste0("now growing random forest for outcome: ", i))
+      form <- as.formula(paste0(i, " ~ ", paste(preds_rf, collapse = " + ")))
+      m_try <- ranger(formula = form, data = obs_rf, num.trees = 1000, mtry = 3)
+      out_cv <- f_cv(n_folds = "all")
+      pl <- f_cv_plot(return = T)
+      assign(paste0("pl_rf_", i), pl)
+      out_summary <- suppressWarnings(f_out())   
+      write.csv(out_summary, paste0(dir_path, "out/04_perf_", i, "_",
+        out_cv$family, ".csv"), row.names = F)
+    }
+    
+    # Combined performance graph
+    x <- lapply(ls(pattern = "pl_rf"), get)
+    ggarrange(plotlist = x, ncol = 2, nrow = 2, labels = 
+      c("global acute malnutrition", "severe acute malnutrition", 
+        "weight-for-height Z-score",
+        "middle-upper-arm circumference for age Z-score"), 
+      align = "hv", font.label = list(size = 11), label.y = 0.95, 
+      common.legend = T, hjust = c(-0.4,-0.4,-0.4,-0.21)) + 
+      bgcolor("white") + border(NA)
+    ggsave(paste0(dir_path, "out/04_rf_combi.png"), units = "cm", 
+      dpi = "print", height = 30, width = 30)
     
         
-# + s(adm1, bs = "re")  
-  
+
 #...............................................................................  
 ### ENDS
 #...............................................................................

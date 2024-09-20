@@ -501,13 +501,14 @@
       geom_point(data = pnts, aes(x = long, y = lat), fill = palette_gen[13], 
         colour = palette_gen[9], shape = 22) +
       theme_bw() +
-      theme(axis.title = element_blank(), legend.position = "top",
+      theme(axis.title = element_blank(), legend.position = "inside",
+        legend.position.inside = c(0.18, 0.18),
         axis.text = element_text(size = 6), 
         legend.text = element_text(size = 6), 
         legend.title = element_text(size = 6)) +
       scale_fill_gradient(name = "number of observations", 
         low = "white", high = palette_gen[6])
-    ggsave(paste0(dir_path, "out/02_map_obs.png"), height = 15, width = 15, 
+    ggsave(paste0(dir_path, "out/02_map_obs.png"), height = 13, width = 15, 
       units = "cm", dpi = 300)
     
        
