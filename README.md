@@ -21,3 +21,9 @@ The `00_master_script.R` code installs and/or loads required R packages, initial
 * `03_merge_categorise_predictors.R` merges all datasets together into one file and explores the distributions of predictors, categorising them if needed;
 * `04_evaluate_models.R` explores predictor patterns and collinearity, does univariate analysis and fits borth generalised linear/additive and random forest models for each anthropometric outcome included in the analysis, while generating tables and graphs of model performance.
 Scripts 01, 02 and 03 need only be run once, upon which the dataset will be readied for analysis by script 04.
+
+## Replicating the analysis
+To replicate the analysis, follow these steps:
+* Download and unzip the repository to any folder in your computer (other than the Downloads folder, which usually gets wiped automatically). The folder is identified automatically when the code is run.
+* Download R and RStudio (see download links on [https://posit.co/download/rstudio-desktop/]). While R is sufficient to run the analysis, it is recommended to instead run the scripts from the RStudio interface.
+* Open and run the entire `00_master_script.R` script (just press Alt+Ctrl+R). This will create an `\out` folder, to which output tables and graphs will be saved automatically. As this scripts calls all the others, it alone is sufficient to replicate the analysis. On a cheap laptop, it should take about max. 10-15 minutes to run the analysis.
