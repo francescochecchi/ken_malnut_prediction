@@ -291,6 +291,8 @@
         breaks = seq(0, 0.5, 0.10), limits = c(0, 0.45)) +
       scale_colour_manual("stratum", values = palette_gen[c(2,6,10,14)]) +
       scale_fill_manual("stratum", values = palette_gen[c(2,6,10,14)]) +
+      annotate("rect", xmin=as.Date("2016-10-01"), xmax=as.Date("2017-12-31"), 
+        ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "firebrick") +      
       facet_grid(adm1~.) +
       theme_bw() +
       theme(legend.position = "top", plot.margin = margin(10,5,0,0))
@@ -307,6 +309,8 @@
         breaks = seq(0, 0.14, 0.02), limits = c(0, 0.14)) +
       scale_colour_manual("stratum", values = palette_gen[c(2,6,10,14)]) +
       scale_fill_manual("stratum", values = palette_gen[c(2,6,10,14)]) +
+      annotate("rect", xmin=as.Date("2016-10-01"), xmax=as.Date("2017-12-31"), 
+        ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "firebrick") +      
       facet_grid(adm1~.) +
       theme_bw() +
       theme(legend.position = "top", plot.margin = margin(10,5,0,0))
@@ -426,6 +430,8 @@
         breaks = seq(-3, 0, 0.25), limits = c(-1.75, -0.25)) +
       scale_colour_manual("stratum", values = palette_gen[c(2,6,10,14)]) +
       scale_fill_manual("stratum", values = palette_gen[c(2,6,10,14)]) +
+      annotate("rect", xmin=as.Date("2016-10-01"), xmax=as.Date("2017-12-31"), 
+        ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "firebrick") +      
       facet_grid(adm1~.) +
       theme_bw() +
       theme(legend.position = "top", plot.margin = margin(10,5,0,0))
@@ -442,6 +448,8 @@
         breaks = seq(-3, 0, 0.25), limits = c(-1.75, -0.25)) +
       scale_colour_manual("stratum", values = palette_gen[c(2,6,10,14)]) +
       scale_fill_manual("stratum", values = palette_gen[c(2,6,10,14)]) +
+      annotate("rect", xmin=as.Date("2016-10-01"), xmax=as.Date("2017-12-31"), 
+        ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "firebrick") +
       facet_grid(adm1~.) +
       theme_bw() +
       theme(legend.position = "top", plot.margin = margin(10,5,0,0))
@@ -467,18 +475,31 @@
     x <- data.frame(adm2 = names(x), n_obs = as.vector(x))
     df <- merge(shp_adm2_trans, x, by = "adm2", all.x = T)
     df[which(is.na(df$n_obs)), "n_obs"] <- 0
+    pnts <- unique(prices_left[, c("market", "lat", "long")])
+    pnts_sf <- st_as_sf(pnts, coords = c("long", "lat"), crs = "EPSG:4326") 
+    pnts_sf <- st_transform(pnts_sf, "EPSG:4326")
+    nudge_x_adm2 <- vector("numeric", length = nrow(df))
+    names(nudge_x_adm2) <- df$adm2 
+    nudge_x_adm2[] <- 0
+    nudge_x_adm2["Baringo South"] <- 0.35
+    nudge_x_adm2["Turkana Central"] <- 0.2
+    nudge_x_adm2["Saku"] <- 0.2
+    nudge_x_adm2["Dujis"] <- 0.1
         
     # Produce a map of counties and subcounties, shaded based on n observations
+        # with market locations
     ggplot() +
       geom_sf(data = df, aes(fill = n_obs), lwd = 0.25, colour = "grey80", 
         alpha = 0.8) +
       geom_sf(data = shp_adm1_trans, lwd = 0.5, colour = "grey20", 
         alpha = 0.3, fill = NA) +
       geom_sf_text(data = df, aes(label = adm2), 
-        colour = "black", size = 1.5) +
+        colour = "black", size = 1.5, nudge_x = as.vector(nudge_x_adm2) ) +
       geom_sf_label(data = shp_adm1_trans, aes(label = adm1), size = 2, 
         colour = "black", alpha = 0.5,
         nudge_y = c(-0.1,0,0,0,0,0,-0.2,0.2,0,-0.2)) +
+      geom_point(data = pnts, aes(x = long, y = lat), fill = palette_gen[13], 
+        colour = palette_gen[9], shape = 22) +
       theme_bw() +
       theme(axis.title = element_blank(), legend.position = "top",
         axis.text = element_text(size = 6), 

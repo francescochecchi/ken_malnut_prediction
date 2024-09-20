@@ -609,10 +609,24 @@
       deflator[which(deflator$currency == "KES"), c("year", "adj")], 
       by = "year", all.x = T)
     prices_left$price_adj <- prices_left$price * prices_left$adj / 100
-    
+
+    # Improve market names
+    prices_left$market <- paste0(prices_left$market, " (", prices_left$adm2,")")
+    prices_left[which(prices_left$market == "Garissa (Dujis)"), 
+      "market"] <- "Garissa (Dujis, Garissa)"
+    prices_left[which(prices_left$market == "Hola (Tana River) (Galole)"), 
+      "market"] <- "Hola (Galole, Tana River)"
+    prices_left[which(prices_left$market=="Lodwar (Turkana) (Turkana Central)"), 
+      "market"] <- "Lodwar (Turkana Central, Turkana)"
+    prices_left[which(prices_left$market=="Mandera (Mandera East)"), 
+      "market"] <- "Mandera (Mandera East, Mandera)"
+    prices_left[which(prices_left$market=="Marigat (Baringo) (Baringo South)"), 
+      "market"] <- "Marigat (Baringo South, Baringo)"
+    prices_left[which(prices_left$market=="Marsabit (Saku)"), 
+      "market"] <- "Marsabit (Saku, Marsabit)"
+   
     # Prepare smoothing output
     prices_left$tm <- (prices_left$year - 2015) * 12 + prices_left$month
-    prices_left$market <- paste0(prices_left$market, " (", prices_left$adm2,")")
     prices_left$date <- as.Date(paste(prices_left$year, prices_left$month, "15",
       sep = "-"))
     prices_left <- prices_left[order(prices_left$market, prices_left$year,
@@ -635,11 +649,13 @@
       scale_y_continuous("price of white maize per Kg (KES, 2015)") +
       scale_colour_manual("market", values = palette_gen[c(1,4,7,10,13,16)]) +
       scale_fill_manual("market", values = palette_gen[c(1,4,7,10,13,16)]) +
+      annotate("rect", xmin=as.Date("2016-10-01"), xmax=as.Date("2017-12-31"), 
+        ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "firebrick") +      
       facet_grid(market ~ .) +
       theme_bw() +
       theme(legend.position = "none")
     ggsave(paste0(dir_path, "out/01_price_series.png"), dpi = "print", 
-      units = "cm", width = 20, height = 30)
+      units = "cm", width = 24, height = 32)
     
     # Compute running means
     prices_left <- prices_left[order(prices_left$market, prices_left$year,

@@ -63,6 +63,7 @@
     setwd(dir_path)
     print( getwd() )
     dir_path <- gsub("/code", "", dir_path)
+    suppressWarnings(dir.create(paste0(dir_path, "out")))
     
     # Initialise random numbers
     set.seed(123)
@@ -90,7 +91,12 @@
   ## Merge all data together and categorise predictors
   source(paste0(dir_path, "code/03_merge_categorise_predictors.r") )
 
-          
+  #...................................      
+  ## Evaluate candidate models
+  source(paste0(dir_path, "code/04_evaluate_models.r") )
+    
+      
+            
 #...............................................................................  
 ### ENDS
 #...............................................................................
