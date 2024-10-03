@@ -54,8 +54,9 @@
     # Clean up from previous code / runs
     rm(list=ls(all=TRUE) )
   
-    # Set font
-    windowsFonts(Arial=windowsFont("Arial"))
+    # Set font for Windows or Mac
+    suppressWarnings(windowsFonts(Arial = windowsFont("Arial")))
+    suppressWarnings(par(family = "Arial"))
 
     # Set working directory to where this file is stored
     dir_path <- paste(dirname(rstudioapi::getActiveDocumentContext()$path  )
