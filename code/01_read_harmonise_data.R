@@ -148,7 +148,7 @@
     # Proportion of women aged 15-49 per grid square literate in 2008/9
     
       # extract data
-      archive::archive_extract(paste0(dir_path, "in/literacy/literacy.7z"),
+      archive::archive_extract(paste0(dir_path, "in/literacy/336.7z"),
         paste0(dir_path, "in/literacy/"))
     
       # compute mean literacy proportion per subcounty
@@ -169,7 +169,7 @@
     # MNH service access (probability of skilled birth attendance, SBA, in 2015)
     
       # extract data
-      archive::archive_extract(paste0(dir_path, "in/mnh_access/mnh.7z"),
+      archive::archive_extract(paste0(dir_path, "in/mnh_access/345.7z"),
         paste0(dir_path, "in/mnh_access/"))
     
       # compute mean SBA proportion per subcounty
@@ -386,7 +386,7 @@
         colour = palette_gen[8], nudge_y = c(-0.1,0,0,0,0,0,-0.2,0.2,0,-0.2)) +
       theme_bw() +
       theme(axis.title = element_blank())
-    ggsave(paste0(dir_path, "out/01_map_adm2.png"), height = 15, width = 15, 
+    ggsave(paste0(dir_path, "out/01_map_adm2.tiff"), height = 15, width = 15, 
       units = "cm", dpi = 300)
 
     # Incorrect and correct nomenclature
@@ -654,7 +654,7 @@
       facet_grid(market ~ .) +
       theme_bw() +
       theme(legend.position = "none")
-    ggsave(paste0(dir_path, "out/01_price_series.png"), dpi = "print", 
+    ggsave(paste0(dir_path, "out/01_price_series.tiff"), dpi = "print", 
       units = "cm", width = 24, height = 32)
     
     # Compute running means
