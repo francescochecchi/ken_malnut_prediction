@@ -70,7 +70,7 @@
         ymin = -Inf, ymax = Inf, alpha = 0.1, fill = "firebrick") +
       theme(legend.position = "none", axis.text.x = element_text(angle = 30,
         hjust = 1, vjust = 1))
-    ggsave(paste0(dir_path, "out/04_predictor trends.png"), units = "cm",
+    ggsave(paste0(dir_path, "out/04_predictor trends.tiff"), units = "cm",
       dpi = "print", height = 38, width = 30)    
     
         
@@ -83,7 +83,7 @@
 
     # Plot correlation
     ggcorr(df, label = T, layout.exp = 1.3, hjust = 1)
-    ggsave(paste0(dir_path, "out/04_preds_correlation.png"), units = "cm",
+    ggsave(paste0(dir_path, "out/04_preds_correlation.tiff"), units = "cm",
       dpi = "print", height = 30, width = 30)
 
 
@@ -182,7 +182,7 @@
         theme_bw() +
         theme(legend.position = "top", axis.text.x = element_text(angle = 30, 
           hjust = 1, vjust = 1))
-      ggsave(paste0(dir_path, "out/04_univariate.png"), units = "cm",
+      ggsave(paste0(dir_path, "out/04_univariate.tiff"), units = "cm",
         dpi = "print", height = 25, width = 20)
       
     
@@ -374,7 +374,7 @@
     if (save) {
       if (out_cv_f$family == "rf") {x <- "out/04_cv_results_rf"} else
         {x <- "out/04_cv_results_glm"}
-      ggsave(paste0(dir_path_f, x, "_", out_cv_f$outcome, ".png"), units = "cm", 
+      ggsave(paste0(dir_path_f, x, "_", out_cv_f$outcome, ".tiff"), units = "cm", 
         dpi = "print", height = height_f, width = width_f)}
     if (return) {return(pl)}
   }
@@ -499,7 +499,7 @@
       align = "hv", font.label = list(size = 11), label.y = 0.95, 
       common.legend = T, hjust = c(-0.4,-0.4,-0.4,-0.21)) + 
       bgcolor("white") + border(NA)
-    ggsave(paste0(dir_path, "out/04_glm_combi.png"), units = "cm", 
+    ggsave(paste0(dir_path, "out/04_glm_combi.tiff"), units = "cm", 
       dpi = "print", height = 30, width = 30)    
     
   #...................................      
@@ -534,7 +534,7 @@
       align = "hv", font.label = list(size = 11), label.y = 0.95, 
       common.legend = T, hjust = c(-0.4,-0.4,-0.4,-0.21)) + 
       bgcolor("white") + border(NA)
-    ggsave(paste0(dir_path, "out/04_rf_combi.png"), units = "cm", 
+    ggsave(paste0(dir_path, "out/04_rf_combi.tiff"), units = "cm", 
       dpi = "print", height = 30, width = 30)
     
         

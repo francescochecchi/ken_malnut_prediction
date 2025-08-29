@@ -296,7 +296,7 @@
       facet_grid(adm1~.) +
       theme_bw() +
       theme(legend.position = "top", plot.margin = margin(10,5,0,0))
-    ggsave(paste0(dir_path, "out/02_svy_estimates_gam.png"), units = "cm",
+    ggsave(paste0(dir_path, "out/02_svy_estimates_gam.tiff"), units = "cm",
       dpi = "print", height = 27, width = 12)
 
     # Plot SAM (just point estimates, otherwise it's confusing)
@@ -314,7 +314,7 @@
       facet_grid(adm1~.) +
       theme_bw() +
       theme(legend.position = "top", plot.margin = margin(10,5,0,0))
-    ggsave(paste0(dir_path, "out/02_svy_estimates_sam.png"), units = "cm",
+    ggsave(paste0(dir_path, "out/02_svy_estimates_sam.tiff"), units = "cm",
       dpi = "print", height = 27, width = 12)
 
     # Combination plot
@@ -324,7 +324,7 @@
       plot_gam + theme(axis.title.y = element_blank()), 
       ncol = 2, 
       labels = levels(df$indicator), font.label = list(face="plain",size=10.5))
-    ggsave(paste0(dir_path, "out/02_svy_estimates_combi1.png"), units = "cm",
+    ggsave(paste0(dir_path, "out/02_svy_estimates_combi1.tiff"), units = "cm",
       dpi = "print", height = 23, width = 17)
      
     
@@ -435,7 +435,7 @@
       facet_grid(adm1~.) +
       theme_bw() +
       theme(legend.position = "top", plot.margin = margin(10,5,0,0))
-    ggsave(paste0(dir_path, "out/02_svy_estimates_whz.png"), units = "cm",
+    ggsave(paste0(dir_path, "out/02_svy_estimates_whz.tiff"), units = "cm",
       dpi = "print", height = 27, width = 12)
 
     # Plot MUAC Z-score (just point estimates, otherwise it's confusing)
@@ -453,7 +453,7 @@
       facet_grid(adm1~.) +
       theme_bw() +
       theme(legend.position = "top", plot.margin = margin(10,5,0,0))
-    ggsave(paste0(dir_path, "out/02_svy_estimates_acz.png"), units = "cm",
+    ggsave(paste0(dir_path, "out/02_svy_estimates_acz.tiff"), units = "cm",
       dpi = "print", height = 27, width = 12)
 
     # Combination plot
@@ -463,7 +463,7 @@
       plot_acz + theme(axis.title.y = element_blank()), 
       ncol = 2, 
       labels = levels(df$indicator), font.label = list(face="plain",size=10.5))
-    ggsave(paste0(dir_path, "out/02_svy_estimates_combi2.png"), units = "cm",
+    ggsave(paste0(dir_path, "out/02_svy_estimates_combi2.tiff"), units = "cm",
       dpi = "print", height = 23, width = 17)
      
 
@@ -508,7 +508,7 @@
         legend.title = element_text(size = 6)) +
       scale_fill_gradient(name = "number of observations", 
         low = "white", high = palette_gen[6])
-    ggsave(paste0(dir_path, "out/02_map_obs.png"), height = 13, width = 15, 
+    ggsave(paste0(dir_path, "out/02_map_obs.tiff"), height = 13, width = 15, 
       units = "cm", dpi = 300)
     
        
