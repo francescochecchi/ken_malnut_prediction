@@ -20,6 +20,7 @@
     pacman::p_load(
       anthro,        # Calculate anthropometric indices
       archive,       # Unzip 7z files
+      car,           # Diagnose multicollinearity in GLMs
       chirps,        # Download CHIRPS rainfall data
       exactextractr, # Extract statistics for each polygon from raster data
       GGally,        # Produce correlation plots
