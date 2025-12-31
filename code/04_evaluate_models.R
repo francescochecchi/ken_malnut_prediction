@@ -605,7 +605,7 @@
         "weight-for-height Z-score"
         ), 
       align = "hv", font.label = list(size = 11), label.y = 0.95, 
-      common.legend = T, hjust = c(-0.4,-0.4,-0.4,-0.21)) + 
+      common.legend = T, hjust = c(-0.4,-0.4,-0.21, -0.4)) + 
       bgcolor("white") + border(NA)
     ggsave(paste0(dir_path, "out/04_glm_combi.tiff"), units = "cm", 
       dpi = "print", height = 30, width = 30)    
