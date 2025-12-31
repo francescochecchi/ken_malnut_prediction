@@ -18,6 +18,11 @@
     obs <- readRDS(paste0(dir_path, "out/03_obs.rds"))
     df_preds <- readRDS(paste0(dir_path, "out/03_preds.rds"))
 
+    # Clean up unused objects
+    x <- ls()
+    x <- x[! x %in% c("obs", "df_preds", "dir_path", "palette_gen")]    
+    rm(list = x)
+    
     # Identify outcomes
     outcomes <- c("sam", "gam", "zwfl", "zac")
     
@@ -382,6 +387,58 @@
   
 
   #...................................      
+  ## Plot relationship between predictors and logit for GLM logistic model
+  f_lin <- function(model_f = m_try) {
+   
+    # Extract model frame and predict logits
+    df <- model_f$data
+    df$logit <- predict(model_f, type = "link", newdata = df)
+    
+    # Eliminate non-numeric predictors and predictors not in the model
+    x <- c("logit", attr(model_f$terms, "term.labels"))
+    df <- df[, x]
+    df <- df[, sapply(df, is.numeric)]
+    
+    # Reshape long
+    predictors <- colnames(df)[colnames(df) != "logit"]
+    df <- gather(df, key = predictors, value = "predictor_value", -logit)
+    
+    # GAM smooth of correlation between logit and each predictor
+    df[, c("smooth", "smooth_lci", "smooth_uci")] <- NA
+    for (i in predictors) {
+      df_i <- df[which(df$predictors == i), c("logit", "predictor_value")]
+      colnames(df_i) <- c("x", "y")
+      m_i <- mgcv::bam(y ~ s(x, bs = "cs", k = 3), data = df_i)
+      x <- predict(m_i, newdata = df_i, se.fit = T)
+      df[which(df$predictors == i), c("smooth", "smooth_lci", "smooth_uci")] <-
+        cbind(
+          x[[1]],
+          x[[1]] - x[[2]] * 1.96,
+          x[[1]] + x[[2]] * 1.96
+        )
+    }
+    
+    # Produce and return plot of smoothed relationships
+    plot <- ggplot() +
+      geom_point(data = df, aes(x = logit, y = predictor_value, 
+        colour = predictors),
+        size = 0.5, alpha = 0.25) +
+      geom_line(data = df, aes(y = smooth, x = logit, colour = predictors)) +
+      geom_ribbon(data = df, 
+        aes(ymin = smooth_lci, ymax = smooth_uci, x = logit, 
+          fill = predictors), alpha = 0.5) +
+      theme_bw() + 
+      scale_x_continuous("predicted logit") +
+      scale_y_continuous("value of the predictor") +
+      scale_colour_viridis_d() +
+      scale_fill_viridis_d() +
+      facet_wrap(.~predictors, scales = "free_y") +
+      theme(legend.position = "none")
+    return(plot)
+  }  
+
+    
+  #...................................      
   ## Gather up summary output for any given model
   f_out <- function(out_cv_f = out_cv, model_f = m_try) {
     
@@ -434,34 +491,7 @@
   }
     
 
-  #...................................      
-  ## Plot relationship between predictors and logit for GLM logistic model
-  f_lin <- function(model_f = m_try) {
-   
-    # Extract model frame and predict logits
-    df <- model_f$data
-    df$logit <- predict(model_f, type = "link", newdata = df)
-    
-    # Eliminate non-numeric predictors and predictors not in the model
-    x <- c("logit", attr(model_f$terms, "term.labels"))
-    df <- df[, x]
-    df <- df[, sapply(df, is.numeric)]
-    
-    # Reshape long
-    predictors <- colnames(df)[colnames(df) != "logit"]
-    df$id <- 1:nrow(df)
-    df <- gather(df, key = predictors, value = "predictor_value", -logit)
-    
-    # Produce and return plot of smoothed relationships
-    plot <- ggplot(df, aes(x = logit, y = predictor_value)) +
-      geom_point(size = 0.5, alpha = 0.5) +
-      geom_smooth(method = "loess") + 
-      theme_bw() + 
-      facet_wrap(~predictors, scales = "free_y")
-    return(plot)
-  }  
 
-  
 #...............................................................................
 ### Evaluating models
 #...............................................................................
@@ -482,13 +512,21 @@
       out_cv$family, ".csv"), row.names = F)
     
       # diagnostics
-      plot(m_try) # influential values (leverage plot)
-      x <- f_lin() # linearity of logit vs predictors
+      tiff(filename = paste0(dir_path, "out/04_perf_", out_cv$outcome, 
+        "_leverage_diag.tif"), units = "cm", res = 700,
+        width = 20, height = 15)
+      plot(m_try, which = 5, sub.caption = "") # leverage plot     
+      dev.off()
+      
+      plot <- f_lin() # linearity of logit vs predictors
       ggsave(paste0(dir_path, "out/04_perf_", out_cv$outcome, 
-        "_linearity_diag.tiff", plot = x, dpi = "print", unit = "cm",
-        width = 20, length = 30))
-      car::vif(m_try) # multicollinearity (2nd column - rule of thumb: <5 is OK)
-    
+        "_linearity_diag.tiff"), dpi = "print", unit = "cm",
+        width = 20, height = 15)
+      
+      x <- car::vif(m_try) # multicollinearity (col 2 - rule of thumb: <5 is OK)
+      write.csv(x, paste0(dir_path, "out/04_perf_", out_cv$outcome, 
+        "_multicoll_diag.csv"))
+          
     # Severe Acute Malnutrition (GAM)
     m_try <- glm(sam ~ sndvi_6m + sam_admissions_rate_3m_cat + price_3m +
       cholera_rate_3m_cat + events_rate_3m_cat + 
@@ -501,8 +539,24 @@
     out_summary
     write.csv(out_summary, paste0(dir_path, "out/04_perf_", out_cv$outcome, "_",
       out_cv$family, ".csv"), row.names = F)
-    glm.diag.plots(m_try)
-    
+
+      # diagnostics
+      tiff(filename = paste0(dir_path, "out/04_perf_", out_cv$outcome, 
+        "_leverage_diag.tif"), units = "cm", res = 700,
+        width = 20, height = 15)
+      plot(m_try, which = 5, sub.caption = "") # leverage plot     
+      dev.off()
+      
+      plot <- f_lin() # linearity of logit vs predictors
+      ggsave(paste0(dir_path, "out/04_perf_", out_cv$outcome, 
+        "_linearity_diag.tiff"), dpi = "print", unit = "cm",
+        width = 20, height = 15)
+      
+      x <- car::vif(m_try) # multicollinearity (col 2 - rule of thumb: <5 is OK)
+      write.csv(x, paste0(dir_path, "out/04_perf_", out_cv$outcome, 
+        "_multicoll_diag.csv"))
+        
+      
     # Weight-for-Height Z-Score
     m_try <- bam(zwfl ~ s(sndvi_6m) + mam_admissions_rate_3m_cat + s(price_3m) +
       cholera_rate_3m_cat + events_rate_3m_cat + 
@@ -514,9 +568,15 @@
     out_summary <- suppressWarnings(f_out())
     write.csv(out_summary, paste0(dir_path, "out/04_perf_", out_cv$outcome, "_",
       out_cv$family, ".csv"), row.names = F)
-    gam.check(m_try)
-    qq.gam(m_try)
-    
+
+      # diagnostics
+      tiff(filename = paste0(dir_path, "out/04_perf_", out_cv$outcome, 
+        "_diag.tif"), units = "cm", res = 700,
+        width = 25, height = 25)
+      par(mfrow = c(2, 2))
+      gam.check(m_try)
+      dev.off()
+
     # MUAC-for-age Z-Score
     m_try <- bam(zac ~ s(sndvi_6m) + mam_admissions_rate_3m_cat + s(price_3m) +
       cholera_rate_3m_cat + events_rate_3m_cat + 
@@ -528,15 +588,22 @@
     out_summary <- suppressWarnings(f_out())
     write.csv(out_summary, paste0(dir_path, "out/04_perf_", out_cv$outcome, "_",
       out_cv$family, ".csv"), row.names = F)
-    gam.check(m_try)
-    qq.gam(m_try)
+    
+      # diagnostics
+      tiff(filename = paste0(dir_path, "out/04_perf_", out_cv$outcome, 
+        "_diag.tif"), units = "cm", res = 700,
+        width = 25, height = 25)
+      par(mfrow = c(2, 2))
+      gam.check(m_try)
+      dev.off()
 
     # Combined performance graph
     x <- lapply(ls(pattern = "pl_glm"), get)
     ggarrange(plotlist = x, ncol = 2, nrow = 2, labels = 
       c("global acute malnutrition", "severe acute malnutrition", 
-        "weight-for-height Z-score",
-        "middle-upper-arm circumference for age Z-score"), 
+        "middle-upper-arm circumference for age Z-score",
+        "weight-for-height Z-score"
+        ), 
       align = "hv", font.label = list(size = 11), label.y = 0.95, 
       common.legend = T, hjust = c(-0.4,-0.4,-0.4,-0.21)) + 
       bgcolor("white") + border(NA)
