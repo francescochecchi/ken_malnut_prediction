@@ -263,7 +263,8 @@
         out[ff, "prop_folded"] <- nrow(obs_rf_fold) / nrow(na.omit(df))
       }
       
-      if (class(model_f)[1] == "bam") {
+      # if the model is generalised additive or linear...
+      if (class(model_f)[1] %in% c("bam", "gam", "glm") ) {
         # try to refit model on training dataset; if no fit, go to next fold
         m_ff <- try(update(model_f, data = df[-x, ]))
         if (class(m_ff)[1] == "try-error") {
@@ -432,8 +433,35 @@
     return(x)
   }
     
-    
 
+  #...................................      
+  ## Plot relationship between predictors and logit for GLM logistic model
+  f_lin <- function(model_f = m_try) {
+   
+    # Extract model frame and predict logits
+    df <- model_f$data
+    df$logit <- predict(model_f, type = "link", newdata = df)
+    
+    # Eliminate non-numeric predictors and predictors not in the model
+    x <- c("logit", attr(model_f$terms, "term.labels"))
+    df <- df[, x]
+    df <- df[, sapply(df, is.numeric)]
+    
+    # Reshape long
+    predictors <- colnames(df)[colnames(df) != "logit"]
+    df$id <- 1:nrow(df)
+    df <- gather(df, key = predictors, value = "predictor_value", -logit)
+    
+    # Produce and return plot of smoothed relationships
+    plot <- ggplot(df, aes(x = logit, y = predictor_value)) +
+      geom_point(size = 0.5, alpha = 0.5) +
+      geom_smooth(method = "loess") + 
+      theme_bw() + 
+      facet_wrap(~predictors, scales = "free_y")
+    return(plot)
+  }  
+
+  
 #...............................................................................
 ### Evaluating models
 #...............................................................................
@@ -442,7 +470,7 @@
   ## Generalised linear/additive models
 
     # Global Acute Malnutrition (GAM)
-    m_try <- bam(gam ~ sndvi_6m + mam_admissions_rate_3m_cat + price_3m +
+    m_try <- glm(gam ~ sndvi_6m + mam_admissions_rate_3m_cat + price_3m +
       cholera_rate_3m_cat + events_rate_3m_cat + 
       mmr1_rate_6m + prop_sba + spi_6m,
       data = obs, family = "binomial")
@@ -452,9 +480,17 @@
     out_summary <- suppressWarnings(f_out())
     write.csv(out_summary, paste0(dir_path, "out/04_perf_", out_cv$outcome, "_",
       out_cv$family, ".csv"), row.names = F)
-
+    
+      # diagnostics
+      plot(m_try) # influential values (leverage plot)
+      x <- f_lin() # linearity of logit vs predictors
+      ggsave(paste0(dir_path, "out/04_perf_", out_cv$outcome, 
+        "_linearity_diag.tiff", plot = x, dpi = "print", unit = "cm",
+        width = 20, length = 30))
+      car::vif(m_try) # multicollinearity (2nd column - rule of thumb: <5 is OK)
+    
     # Severe Acute Malnutrition (GAM)
-    m_try <- bam(sam ~ sndvi_6m + sam_admissions_rate_3m_cat + price_3m +
+    m_try <- glm(sam ~ sndvi_6m + sam_admissions_rate_3m_cat + price_3m +
       cholera_rate_3m_cat + events_rate_3m_cat + 
       mmr1_rate_6m + prop_sba + spi_6m, data = obs, family = "binomial")
     summary(m_try)
@@ -465,7 +501,8 @@
     out_summary
     write.csv(out_summary, paste0(dir_path, "out/04_perf_", out_cv$outcome, "_",
       out_cv$family, ".csv"), row.names = F)
-
+    glm.diag.plots(m_try)
+    
     # Weight-for-Height Z-Score
     m_try <- bam(zwfl ~ s(sndvi_6m) + mam_admissions_rate_3m_cat + s(price_3m) +
       cholera_rate_3m_cat + events_rate_3m_cat + 
@@ -477,7 +514,9 @@
     out_summary <- suppressWarnings(f_out())
     write.csv(out_summary, paste0(dir_path, "out/04_perf_", out_cv$outcome, "_",
       out_cv$family, ".csv"), row.names = F)
-
+    gam.check(m_try)
+    qq.gam(m_try)
+    
     # MUAC-for-age Z-Score
     m_try <- bam(zac ~ s(sndvi_6m) + mam_admissions_rate_3m_cat + s(price_3m) +
       cholera_rate_3m_cat + events_rate_3m_cat + 
@@ -489,6 +528,8 @@
     out_summary <- suppressWarnings(f_out())
     write.csv(out_summary, paste0(dir_path, "out/04_perf_", out_cv$outcome, "_",
       out_cv$family, ".csv"), row.names = F)
+    gam.check(m_try)
+    qq.gam(m_try)
 
     # Combined performance graph
     x <- lapply(ls(pattern = "pl_glm"), get)
