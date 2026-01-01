@@ -620,7 +620,7 @@
       "schooling_cov")
     obs_rf <- na.omit(obs[, c(outcomes, preds_rf)])
     
-    # Grow random forest models for each of the four outcomes
+    # Grow random forest models for each of the four outcomes; 3 vars per node
     for (i in outcomes) {
       print(paste0("now growing random forest for outcome: ", i))
       form <- as.formula(paste0(i, " ~ ", paste(preds_rf, collapse = " + ")))
@@ -630,22 +630,48 @@
       assign(paste0("pl_rf_", i), pl)
       out_summary <- suppressWarnings(f_out())   
       write.csv(out_summary, paste0(dir_path, "out/04_perf_", i, "_",
-        out_cv$family, ".csv"), row.names = F)
+        out_cv$family, "_3vars.csv"), row.names = F)
     }
     
-    # Combined performance graph
-    x <- lapply(ls(pattern = "pl_rf"), get)
-    ggarrange(plotlist = x, ncol = 2, nrow = 2, labels = 
-      c("global acute malnutrition", "severe acute malnutrition", 
-        "weight-for-height Z-score",
-        "middle-upper-arm circumference for age Z-score"), 
-      align = "hv", font.label = list(size = 11), label.y = 0.95, 
-      common.legend = T, hjust = c(-0.4,-0.4,-0.4,-0.21)) + 
-      bgcolor("white") + border(NA)
-    ggsave(paste0(dir_path, "out/04_rf_combi.tiff"), units = "cm", 
-      dpi = "print", height = 30, width = 30)
+      # combined performance graph
+      x <- lapply(ls(pattern = "pl_rf"), get)
+      ggarrange(plotlist = x, ncol = 2, nrow = 2, labels = 
+        c("global acute malnutrition", "severe acute malnutrition", 
+          "middle-upper-arm circumference for age Z-score",
+          "weight-for-height Z-score"
+          ), 
+        align = "hv", font.label = list(size = 11), label.y = 0.95, 
+        common.legend = T, hjust = c(-0.4,-0.4,-0.21,-0.4)) + 
+        bgcolor("white") + border(NA)
+      ggsave(paste0(dir_path, "out/04_rf_combi_3vars.tiff"), units = "cm", 
+        dpi = "print", height = 30, width = 30)
     
-        
+     # Grow random forest models for each of the four outcomes; 5 vars per node
+    for (i in outcomes) {
+      print(paste0("now growing random forest for outcome: ", i))
+      form <- as.formula(paste0(i, " ~ ", paste(preds_rf, collapse = " + ")))
+      m_try <- ranger(formula = form, data = obs_rf, num.trees = 1000, mtry = 5)
+      out_cv <- f_cv(n_folds = "all")
+      pl <- f_cv_plot(return = T)
+      assign(paste0("pl_rf_", i), pl)
+      out_summary <- suppressWarnings(f_out())   
+      write.csv(out_summary, paste0(dir_path, "out/04_perf_", i, "_",
+        out_cv$family, "_5vars.csv"), row.names = F)
+    }
+    
+      # combined performance graph
+      x <- lapply(ls(pattern = "pl_rf"), get)
+      ggarrange(plotlist = x, ncol = 2, nrow = 2, labels = 
+        c("global acute malnutrition", "severe acute malnutrition", 
+          "middle-upper-arm circumference for age Z-score",
+          "weight-for-height Z-score"
+          ), 
+        align = "hv", font.label = list(size = 11), label.y = 0.95, 
+        common.legend = T, hjust = c(-0.4,-0.4,-0.21,-0.4)) + 
+        bgcolor("white") + border(NA)
+      ggsave(paste0(dir_path, "out/04_rf_combi_5vars.tiff"), units = "cm", 
+        dpi = "print", height = 30, width = 30)
+       
 
 #...............................................................................  
 ### ENDS
